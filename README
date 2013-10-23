@@ -1,0 +1,13 @@
+WebRTC sample by mganeko
+
+source code for node.js 0.10.x 
+
+You need modules:
+ npm install fs
+ npm install socket.io
+
+
+* To use SSL, please prepare certificate.
+
+
+

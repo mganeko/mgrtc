@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebRTC multiroom</title>  
+</head>
+<body>
+  <button type="button" onclick="startVideo();">Start video</button>
+  <button type="button" onclick="stopVideo();">Stop video</button>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <button type="button" onclick="connect();">Connect</button>
+  <button type="button" onclick="hangUp();">Hang Up</button>
+  <br />
+  <div style="position: relative;">
+  <video id="local-video" autoplay style="position: absolute; top: 0px; width: 160px; height: 120px; border: 1px solid black;"></video>
+  <video id="remote-video" autoplay style="position: absolute; top: 0px; left: 165px; width: 800px; height: 600px; border: 1px solid black;"></video>
+  </div>
+
+  <script src="http://localhost:9002/socket.io/socket.io.js"></script>
+  <script>
+  // create socket
+  var socket = io.connect('http://localhost:9002/');
+
+  var localVideo = document.getElementById('local-video');
+  var remoteVideo = document.getElementById('remote-video');
+  var localStream = null;
+  var peerConn = null;
+  var peerStarted = false;
+  var channelReady = false;
+  var mediaConstraints = {'mandatory': {
+                          'OfferToReceiveAudio':true, 
+                          'OfferToReceiveVideo':true }};
+
+  // ----- multi room ----
+  function getRoomName() {
+    var url = document.location.href;
+    console.log("url = " + url);
+    var args = url.split('?');
+    if (args.length > 1) {
+      var room = args[1];
+      console.log("room = " + room);
+      if (room != "") {
+        return room;
+      }
+    }
+
+    return "_defaultroom";
+  }
+
+
+  // --------------------- socket event ---------------
+  // socket: channel connected
+  socket.on('connect', onChannelOpened)
+        .on('message', onMessage);
+
+  function onChannelOpened(evt) {
+    console.log('Channel opened.');
+    channelReady = true;
+
+    // ---- multi room ----
+    var roomname = getRoomName();
+    socket.emit('enter', roomname);
+    console.log("enter room=", roomname);
+
+  }
+
+  // socket: accept connection request
+  function onMessage(evt) {
+    if (evt.type === 'offer') {
+      console.log("Received offer...")
+      if (!peerStarted) {
+        sendAnswer(evt);
+        peerStarted = true;
+      }
+
+    } else if (evt.type === 'answer' && peerStarted) {
+      console.log('Received answer...');
+      console.log('Setting remote session description...' );
+      peerConn.setRemoteDescription(new RTCSessionDescription(evt));
+
+    } else if (evt.type === 'candidate' && peerStarted) {
+      console.log('Received ICE candidate...');
+      var candidate = new RTCIceCandidate({sdpMLineIndex:evt.sdpMLineIndex, sdpMid:evt.sdpMid, candidate:evt.candidate});
+      console.log(candidate);
+      peerConn.addIceCandidate(candidate);
+
+    } else if (evt.type === 'bye' && peerStarted) {
+      console.log("Received bye");
+      stop();
+    }
+  }
+
+
+  // ---------------------- video handling -----------------------
+  // get the local video up
+  function startVideo() {
+    navigator.webkitGetUserMedia({video: true, audio: true}, successCallback, errorCallback);
+    function successCallback(stream) {
+      localStream = stream;
+      localVideo.src = window.webkitURL.createObjectURL(stream);
+      localVideo.play();
+    }
+
+    function errorCallback(error) {
+      console.error('An error occurred: [CODE ' + error.code + ']');
+      return;
+    }
+  }
+
+  // stop local video
+  function stopVideo() {
+    localVideo.src = "";
+    localStream.stop();
+  }
+
+  // ---------------------- connection handling -----------------------
+  function prepareNewConnection() {
+    var pc_config = {"iceServers":[]};
+    var peer = null;
+    try {
+      peer = new webkitRTCPeerConnection(pc_config);
+    } catch (e) {
+      console.log("Failed to create PeerConnection, exception: " + e.message);
+    }
+
+    // send any ice candidates to the other peer
+    peer.onicecandidate = function (evt) {
+      if (evt.candidate) {
+        console.log(evt.candidate);
+        socket.json.send({type: "candidate", 
+                          sdpMLineIndex: evt.candidate.sdpMLineIndex,
+                          sdpMid: evt.candidate.sdpMid,
+                          candidate: evt.candidate.candidate});
+      } else {
+        console.log("End of candidates. ------------------- phase=" + evt.eventPhase);
+      }
+    };
+
+    console.log('Adding local stream...');
+    peer.addStream(localStream);
+
+    peer.addEventListener("addstream", onRemoteStreamAdded, false);
+    peer.addEventListener("removestream", onRemoteStreamRemoved, false)
+
+    // when remote adds a stream, hand it on to the local video element
+    function onRemoteStreamAdded(event) {
+      console.log("Added remote stream");
+      remoteVideo.src = window.webkitURL.createObjectURL(event.stream);
+    }
+
+    // when remote removes a stream, remove it from the local video element
+    function onRemoteStreamRemoved(event) {
+      console.log("Remove remote stream");
+      remoteVideo.src = "";
+    }
+
+    return peer;
+  }
+
+  function sendOffer() {
+    peerConn = prepareNewConnection();
+    peerConn.createOffer(function (sessionDescription) { // in case of success
+      peerConn.setLocalDescription(sessionDescription);
+      console.log("Sending: SDP");
+      console.log(sessionDescription);
+      socket.json.send(sessionDescription);
+    }, function () { // in case of error
+      console.log("Create Offer failed");
+    }, mediaConstraints);
+  }
+
+  function sendAnswer(evt) {
+    console.log('sending Answer. Creating remote session description...' );
+    peerConn = prepareNewConnection();
+    peerConn.setRemoteDescription(new RTCSessionDescription(evt));
+    peerConn.createAnswer(function (sessionDescription) { // in case of success
+      peerConn.setLocalDescription(sessionDescription);
+      console.log("Sending: SDP");
+      console.log(sessionDescription);
+      socket.json.send(sessionDescription);
+    }, function () { // in case of error
+      console.log("Create Answer failed");
+    }, mediaConstraints);
+  }
+
+
+  // ---------------- handling user UI event -----
+  // start the connection upon user request
+  function connect() {
+    if (!peerStarted && localStream && channelReady) {
+      sendOffer();
+      peerStarted = true;
+    } else {
+      alert("Local stream not running yet - try again.");
+    }
+  }
+
+  // stop the connection upon user request
+  function hangUp() {
+    console.log("Hang up.");    
+    socket.json.send({type: "bye"});
+    stop();
+  }
+
+  function stop() {
+    peerConn.close();
+    peerConn = null;
+    peerStarted = false;    
+  }
+
+  </script>
+</body>
+</html>

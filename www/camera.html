@@ -1,0 +1,98 @@
+<html>
+ <head>
+  <title>WebRTC Camera</title>
+
+  <style type="text/css">
+#video6
+{
+    position: absolute;
+    -webkit-animation-duration:2s;
+    -webkit-animation-iteration-count:infinite;
+    -webkit-animation-timing-function:linear;
+    -webkit-animation-name:rectRotate;
+     
+    -moz-animation-duration:2s;
+    -moz-animation-iteration-count:infinite;
+    -moz-animation-timing-function:linear;
+    -moz-animation-name:rectRotate;
+     
+    -o-animation-duration:2s;
+    -o-animation-iteration-count:infinite;
+    -o-animation-timing-function:linear;
+    -o-animation-name:rectRotate;
+     
+    -ms-animation-duration:2s;
+    -ms-animation-iteration-count:infinite;
+    -ms-animation-timing-function:linear;
+    -ms-animation-name:rectRotate;
+}
+ 
+@-webkit-keyframes rectRotate
+{
+    0%{-webkit-transform:rotate(0deg);}
+    99%,100%{-webkit-transform:rotate(360deg);}
+}
+ 
+@-moz-keyframes rectRotate
+{
+    0%{-moz-transform:rotate(0deg);}
+    99%,100%{-moz-transform:rotate(360deg);}
+}
+ 
+@-o-keyframes rectRotate
+{
+    0%{-o-transform:rotate(0deg);}
+    99%,100%{-o-transform:rotate(360deg);}
+}
+ 
+@-ms-keyframes rectRotate
+{
+     0%{-ms-transform:rotate(0deg);}
+    99%,100%{-ms-transform:rotate(360deg);}
+}
+</style>
+
+ <head>
+ <body>
+  <video id="video1" autoplay="1" width="320px" height="240px"></video>
+  <video id="video2" autoplay="1" style="-webkit-transform: scaleX(-1);" width="320px" height="240px"></video><br />
+
+  <video id="video3" autoplay="1" style="-webkit-transform: scaleX(0.5);" width="320px" height="240px"></video>
+  <video id="video4" autoplay="1" style="-webkit-transform: scaleX(1.5);" width="320px" height="240px"></video><br />
+
+  <video id="video5" autoplay="1" style="-webkit-transform: scaleY(-1);" width="320px" height="240px"></video>
+  <video id="video6" autoplay="1" style="-webkit-transform: rotate(-30deg);" width="320px" height="240px"></video><br />
+
+  <video id="video7" autoplay="1" style="-webkit-filter: grayscale(100%);" width="320px" height="240px"></video>
+  <video id="video8" autoplay="1" style="-webkit-filter: sepia(100%);" width="320px" height="240px"></video><br />
+
+ </body>
+ <script>
+  var video1 = document.getElementById('video1');
+  var video2 = document.getElementById('video2');
+  var video3 = document.getElementById('video3');
+  var video4 = document.getElementById('video4');
+  var video5 = document.getElementById('video5');
+  var video6 = document.getElementById('video6');
+  var video7 = document.getElementById('video7');
+  var video8 = document.getElementById('video8');
+
+  navigator.webkitGetUserMedia({audio:false, video:true},
+   function(stream) { // success
+    video1.src = window.webkitURL.createObjectURL(stream);
+    video2.src = window.webkitURL.createObjectURL(stream);
+    video3.src = window.webkitURL.createObjectURL(stream);
+    video4.src = window.webkitURL.createObjectURL(stream);
+
+    video5.src = window.webkitURL.createObjectURL(stream);
+    video6.src = window.webkitURL.createObjectURL(stream);
+    video7.src = window.webkitURL.createObjectURL(stream);
+    video8.src = window.webkitURL.createObjectURL(stream);
+   },
+   function(err) { // error
+    console.log(err);
+   }
+  );
+ </script>
+</html>
+
